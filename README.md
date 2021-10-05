@@ -4,7 +4,8 @@ Label Distribution Learning (LDL) with Python implemention, including
 - PT-SVM
 - PT-Bayes
 - AA-kNN
-- bfgs_ldl \
+- bfgs_ldl
+
 and some LDL datasets with numpy array, including
 - Yeast_alpha
 - Yeast_cdc
