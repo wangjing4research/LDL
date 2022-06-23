@@ -24,11 +24,9 @@ def LDL2Bayes(Y):
 
 class bfgs_ldl:
 
-    def __init__(self, x, y, C = 0):
+    #C is the regularization parameter
+    def __init__(self, C = 0):
         self.C = C
-        self.x = x
-        self.y = y
-        self.n_features, self.n_outputs = self.x.shape[1], self.y.shape[1]
 
     def predict(self, x):
         p_yx = np.dot(x, self.W)
@@ -59,7 +57,11 @@ class bfgs_ldl:
         y_pre = np.clip(y_pre, 1e-7, 1)
         return -1 * np.sum(y_true * np.log(y_pre))
 
-    def fit(self):        
+    def fit(self, train_x, train_y):     
+        self.x = train_x
+        self.y = train_y
+        self.n_features, self.n_outputs = self.x.shape[1], self.y.shape[1]
+        
         weights = np.random.uniform(-0.1, 0.1, self.n_features * self.n_outputs)
         optimize_result = minimize(self.object_fun, weights, method = 'l-BFGS-b', jac = True,
                                    options = {'gtol':1e-6, 'disp': False, 'maxiter':600 })
@@ -73,38 +75,35 @@ class bfgs_ldl:
 
 
 class AA_KNN:
-    def __init__(self,train_X, train_Y, K = 5):
-        self.train_X = None
-        self.train_Y = None
-        self.K = K
-        self.model =NearestNeighbors(n_neighbors=self.K, algorithm='brute')
+    def __init__(self, k = 1):
+        self.k = k
+        self.model =NearestNeighbors(n_neighbors = 10, algorithm='brute', n_jobs = -1)
+    
+    def fit(self, train_X, train_Y):
         self.train_X = train_X
         self.train_Y = train_Y
-    
-    def fit(self, test_X, test_Y):
-        self.test_X = test_X
-        self.test_Y = test_Y
-        
         self.model.fit(self.train_X)
-        _, inds = self.model.kneighbors(self.test_X)
-        self.inds = inds
         
-    def score(self, k):
-        self.k = k
+    
+    def predict(self, test_X):
+        _, inds = self.model.kneighbors(test_X)
         Y_hat = None
         i = 0
         for i in range(self.k):
-            ind = self.inds.T[i]
+            ind = inds.T[i]
             if Y_hat is None:
                 Y_hat = self.train_Y[ind]
             else:
                 Y_hat += self.train_Y[ind]
-        Y_hat = Y_hat / self.k      
+        Y_hat = Y_hat / self.k    
         
-        return (zero_one_measure(self.test_Y, Y_hat), error(self.test_Y, Y_hat))
+        return Y_hat
+    
+    def __str__(self):
+        name = "AA_KNN_"
+        name += "K=" + str(self.k)
         
-    def to_str(self, k):
-        return "AA-KNN_K=" + str(k)
+        return name
 
 
 class PT_Bayes:
@@ -114,20 +113,12 @@ class PT_Bayes:
         self.toSL = toSL
         self.train_Y = self.toSL(train_Y)
         
-    
     def fit(self):
-
         self.model.fit(self.train_X, self.train_Y)
     
-    def score(self, test_X, test_Y):
+    def predict(self, test_X):
         Y_hat = self.model.predict(test_X)
-        return (zero_one_measure(self.toSL(test_Y), Y_hat), error(test_Y, Y_hat))
-    
-    def __str__(self):
-        if self.toSL is LDL2SL:
-            return "PT-Bayes_LDL2SL"
-        else:
-            return "PT-Bayes_Bayes"
+        return Y_hat
 
 
 class PT_SVM:
@@ -141,9 +132,10 @@ class PT_SVM:
     def fit(self):
         self.model.fit(self.train_X, self.train_Y)
         
-    def score(self, test_X, test_Y):
+    def predict(self, test_X):
         Y_hat = self.model.predict(test_X)
-        return (zero_one_measure(self.toSL(test_Y), Y_hat), error(test_Y, Y_hat))
+        return Y_hat
+    
     def __str__(self):
         if self.toSL is LDL2SL:
             return "PT-SVM_LDL2SL_C=" + str(self.C)
